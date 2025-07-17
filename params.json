@@ -1,0 +1,25 @@
+{
+  "hf_token_id": "",
+  "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+  "tok_path": "tokenizer.model.v3",
+  "train_data_path": "data/train.jsonl",
+  "val_data_path": "data/test.jsonl",
+  "train_batch_size": 2,
+  "val_batch_size": 1,
+  "lr": 1e-5,
+  "wd": 0.01,
+  "epochs": 3,
+  "max_norm": 1.0,
+  "accum_steps": 4,
+  "peft_kwargs": {
+    "r": 16,
+    "alpha": 32,
+    "dropout": 0.1
+  },
+  "EPOCHS_LOGS":1,
+  "save_dir": "checkpoints",
+  "checkpoint_name": "model-version-1",
+  "push_hf": true,
+  "hf_repo_path": "checkpoints",
+  "repo_id": "Muhammed164/Misteral-finetuned"
+}
