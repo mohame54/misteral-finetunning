@@ -35,7 +35,7 @@ hf_permission(config.hf_token_id)
 api = HfApi()
 
 
-dtype = torch.bfloat16 if check_bfloat16_support(ddp_rank=0) else torch.float16
+dtype = torch.bfloat16 if check_bfloat16_support(ddp_rank==0) else torch.float16
 
 #load the data
 

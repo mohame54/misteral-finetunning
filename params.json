@@ -4,17 +4,18 @@
   "tok_path": "tokenizer.model.v3",
   "train_data_path": "data/train.jsonl",
   "val_data_path": "data/test.jsonl",
-  "train_batch_size": 2,
+  "train_batch_size": 1,
   "val_batch_size": 1,
   "lr": 1e-5,
   "wd": 0.01,
   "epochs": 3,
   "max_norm": 1.0,
-  "accum_steps": 4,
+  "accum_steps": 2,
   "peft_kwargs": {
-    "r": 16,
-    "alpha": 32,
-    "dropout": 0.1
+    "r": 4,
+   "lora_alpha": 8,
+    "lora_dropout": 0.1,
+     "bias":"none"
   },
   "EPOCHS_LOGS":1,
   "save_dir": "checkpoints",

@@ -38,7 +38,7 @@ def train_epoch(
             model.require_backward_grad_sync = ((idx + 1) % grad_accum_steps == 0)
 
         with torch.autocast(device_type="cuda", dtype=compute_dtype):
-            preds = model(inputs)
+            preds = model(inputs).logits
             loss = masked_cross_entropy_loss(preds, labels, mask)
 
         loss = loss / grad_accum_steps
@@ -92,7 +92,7 @@ def validate_epoch(
         inputs, labels, mask = [x.to(rank) for x in (inputs, labels, mask)]
 
         with torch.autocast(device_type="cuda", dtype=compute_dtype):
-            preds = model(inputs)
+            preds = model(inputs).logits
             loss = masked_cross_entropy_loss(preds, labels, mask)
 
         loss_val = loss.detach().item()
