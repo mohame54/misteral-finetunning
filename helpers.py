@@ -55,7 +55,7 @@ def collate_fn(batch):
     
 
 class TokenDataset(Dataset):
-    def __init__(self, tokenizer_pth, data_pth, block_size=2048):
+    def __init__(self, tokenizer_pth, data_pth, block_size=1024):
         self.tokenizer = MistralTokenizer.from_file(tokenizer_pth)
         self.block_size = block_size
         self.df = pd.read_json(data_pth, lines=True)
@@ -70,14 +70,22 @@ class TokenDataset(Dataset):
         messages[1]['content'] = f"{system_prompt}\n\n{messages[1]['content']}"
         chat = from_completion2InstructTokens(messages[1:], None)
         sample = tokenize_instruct(chat, self.tokenizer.instruct_tokenizer)
-        x = torch.tensor(sample.tokens[:-1], dtype=torch.long)
-        y = torch.tensor(sample.tokens[1:], dtype=torch.long)
-        mask = torch.tensor(sample.masks[1:], dtype=torch.bool)
-        return x, y, mask
+
+        tokens = sample.tokens
+        masks  = sample.masks
+        if len(tokens) > self.block_size:
+            tokens_eos_id = tokens[-1]
+            tokens = tokens[:self.block_size] + [tokens_eos_id]
+            masks  = masks[:self.block_size] + [tokens_eos_id]
+
+        x = torch.tensor(tokens[:-1], dtype=torch.long)
+        y = torch.tensor(tokens[1:], dtype=torch.long)
+        m = torch.tensor(masks[1:], dtype=torch.bool)
+        return x, y, m
 
 
-def get_loader(tokenizer_pth, data_pth, batch_size, world_size, rank):
-    ds = TokenDataset(tokenizer_pth, data_pth)
+def get_loader(tokenizer_pth, data_pth, batch_size, world_size, rank, block_size=2048):
+    ds = TokenDataset(tokenizer_pth, data_pth, block_size=block_size)
     sampler = DistributedSampler(ds, num_replicas=world_size, rank=rank, shuffle=True)
     return DataLoader(ds, batch_size=batch_size, sampler=sampler, drop_last=True, collate_fn=collate_fn)
 

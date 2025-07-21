@@ -2,10 +2,8 @@ import os
 import json
 import math
 import torch
-from transformers import BitsAndBytesConfig
-from transformers import  AutoModelForCausalLM
+from unsloth import FastLanguageModel, FastModel
 from huggingface_hub.hf_api import HfFolder
-from peft import LoraConfig, get_peft_model
 from huggingface_hub import create_repo
 from huggingface_hub import Repository
 import torch.nn.functional as F
@@ -81,19 +79,13 @@ def check_bfloat16_support(logs=True):
     return False
 
 
-def load_pretrained(model_id, logs=True, **config):
-    dtype = torch.bfloat16 if check_bfloat16_support(logs) else torch.float16
-    params = config if len(config) else dict(
-        load_in_4bit=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_use_double_quant=True,
-        bnb_4bit_compute_dtype=dtype,
-        bnb_4bit_quant_storage=dtype
-    )
-    config = BitsAndBytesConfig(**params)
-    model = AutoModelForCausalLM.from_pretrained(model_id, quantization_config=config, torch_dtype=dtype)
+def load_pretrained(model_id, **config):
+    model, _ = FastModel.from_pretrained(
+        model_name =model_id,
+        full_finetuning = False,
+        **config
+        )   
     return model
-
 
 
 def get_lr_util(it, warmup_steps=200, max_steps=500000, max_lr= 6e-4, min_lr=6e-5):
@@ -130,26 +122,28 @@ def make_peft_model(
     logs=True,
     r=16,
     lora_alpha=32,
+    lora_dropout=0,
     target_modules="all-linear",
     bias="none",
     **kwargs
-):
-    params = dict(
-          r=r,
-          lora_alpha=lora_alpha,
-          target_modules=target_modules,
-          lora_dropout=0.2,
-          bias=bias,
-      )
-   
-    params.update(
-          kwargs
-      )  
-    config = LoraConfig(
-      **params
+): 
+    max_len = kwargs.get("max_length", 2048)
+    random_state = kwargs.get("random_state", 3407)
+    lora_model = FastLanguageModel.get_peft_model(
+        model,
+        r = r,
+        target_modules = target_modules,
+        lora_alpha = lora_alpha,
+        lora_dropout = lora_dropout,
+        bias = bias,
+        use_gradient_checkpointing = "unsloth", 
+        random_state = random_state,
+        max_seq_length = max_len,
+        use_rslora = False, 
+        loftq_config = None,
     )
-    lora_model = get_peft_model(model, config)
     if logs:
-      print("Setting Up the lora model with parameters", params)
       print_trainable_parameters(lora_model)
+    for n, p in lora_model.named_parameters():
+        p.requires_grad = "lora_" in n
     return  lora_model  

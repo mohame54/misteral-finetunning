@@ -44,7 +44,8 @@ train_loader = get_loader(
     config.train_data_path,
     config.train_batch_size,
     world_size,
-    ddp_rank
+    ddp_rank,
+    block_size=config.model_config['max_seq_length']
 )
 
 test_loader = get_loader(
@@ -56,7 +57,7 @@ test_loader = get_loader(
 )
 
 # Load model
-model = load_pretrained(config.model_id, logs=ddp_rank==0)
+model = load_pretrained(config.model_id, **config.model_config)
 for p in model.parameters():
     if p.requires_grad:
         p.data = p.data.float()

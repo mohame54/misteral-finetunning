@@ -1,5 +1,5 @@
 transformers
 bitsandbytes
-peft
+unsloth
 mistral_common
 pandas
