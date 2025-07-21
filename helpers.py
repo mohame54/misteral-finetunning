@@ -84,10 +84,19 @@ class TokenDataset(Dataset):
         return x, y, m
 
 
-def get_loader(tokenizer_pth, data_pth, batch_size, world_size, rank, block_size=2048):
+def get_loader(tokenizer_pth, data_pth, batch_size, world_size, rank, block_size=2048, add_sampler=True):
     ds = TokenDataset(tokenizer_pth, data_pth, block_size=block_size)
     sampler = DistributedSampler(ds, num_replicas=world_size, rank=rank, shuffle=True)
-    return DataLoader(ds, batch_size=batch_size, sampler=sampler, drop_last=True, collate_fn=collate_fn)
+    kwargs = dict(
+        batch_size=batch_size,
+        drop_last=True,
+        collate_fn=collate_fn
+    )
+    if add_sampler:
+        kwargs.update(
+            {"sampler":sampler}
+        )
+    return DataLoader(ds, **kwargs)
 
 
 def from_completion2InstructTokens(

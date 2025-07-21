@@ -143,3 +143,96 @@ def configure_optimizers(model, weight_decay, learning_rate, device_type, rank):
         print(f"using fused AdamW: {use_fused}")
     optimizer = torch.optim.AdamW(optim_groups, lr=learning_rate, betas=(0.9, 0.95), eps=1e-8, fused=use_fused)
     return optimizer
+
+
+def train_epoch_gpu(
+    model: torch.nn.Module,
+    train_loader: torch.utils.data.DataLoader,
+    optimizer: torch.optim.Optimizer,
+    scaler: torch.cuda.amp.GradScaler,
+    device: torch.device = torch.device("cuda"),
+    max_norm: float = None,
+    grad_accum_steps: int = 1,
+    compute_dtype: torch.dtype = torch.float16,
+):
+    model.train()
+    losses = []
+    optimizer.zero_grad()
+    accum_loss = 0.0
+    last_time = time.time()
+    loader = tqdm(train_loader, desc="Train")
+
+    for idx, (inputs, labels, mask) in enumerate(loader):
+        inputs = inputs.to(device)
+        labels = labels.to(device)
+        mask = mask.to(device)
+
+        with torch.autocast(device_type="cuda", dtype=compute_dtype):
+            preds = model(inputs).logits
+            loss = masked_cross_entropy_loss(preds, labels, mask)
+
+        loss = loss / grad_accum_steps
+        scaler.scale(loss).backward()
+        accum_loss += loss.item()
+
+        # gradient accumulation step
+        if (idx + 1) % grad_accum_steps == 0 or (idx + 1) == len(train_loader):
+            if max_norm is not None:
+                scaler.unscale_(optimizer)
+                clip_grad_norm_(model.parameters(), max_norm)
+
+            scaler.step(optimizer)
+            scaler.update()
+            torch.cuda.synchronize()
+            optimizer.zero_grad()
+
+            # logging
+            current_time = time.time()
+            dt = current_time - last_time
+            last_time = current_time
+
+            losses.append(accum_loss)
+            loader.set_postfix({
+                "Train Loss": f"{mean(losses):.4f}",
+                "Step Time": f"{dt:.2f}s"
+            })
+            accum_loss = 0.0
+
+    return mean(losses)
+
+
+@torch.no_grad()
+def validate_epoch_gpu(
+    model: torch.nn.Module,
+    val_loader: torch.utils.data.DataLoader,
+    device: torch.device = torch.device("cuda"),
+    compute_dtype: torch.dtype = torch.float16,
+):
+    model.eval()
+    losses = []
+    last_time = time.time()
+    loader = tqdm(val_loader, desc="Validation")
+
+    for inputs, labels, mask in loader:
+        inputs = inputs.to(device)
+        labels = labels.to(device)
+        mask = mask.to(device)
+
+        with torch.autocast(device_type="cuda", dtype=compute_dtype):
+            preds = model(inputs).logits
+            loss = masked_cross_entropy_loss(preds, labels, mask)
+
+        loss_val = loss.item()
+        losses.append(loss_val)
+
+        current_time = time.time()
+        dt = current_time - last_time
+        last_time = current_time
+
+        avg_so_far = mean(losses)
+        loader.set_postfix({
+            "Val Loss": f"{avg_so_far:.4f}",
+            "Step Time": f"{dt:.2f}s"
+        })
+
+    return mean(losses) if losses else None
