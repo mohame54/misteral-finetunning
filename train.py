@@ -61,7 +61,7 @@ def train_epoch(
 
             total_loss = torch.tensor(accum_loss, device=rank)
             dist.all_reduce(total_loss, op=dist.ReduceOp.SUM)
-            avg_loss = total_loss.item() / (dist.get_world_size() * grad_accum_steps)
+            avg_loss = total_loss.item() / dist.get_world_size()
 
             if rank == 0:
                 losses.append(avg_loss)
