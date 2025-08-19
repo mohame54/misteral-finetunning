@@ -15,8 +15,11 @@ class DataHolder:
           setattr(self, k, v)
        self.kwargs = kwargs
 
-   def get(self, key, default):
+   def get(self, key, default=None):
        return self.kwargs.get(key, default)
+   
+   def __getitem__(self, key):
+       return self.kwargs[key]
    
 
 def save_model_util(
