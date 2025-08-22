@@ -115,9 +115,13 @@ def set_training(model, to_train=True):
 
 def masked_cross_entropy_loss(logits, labels, mask):
     num_tokens = logits.size(-1)
-    ignore_mask = torch.logical_not(mask)
-    labels_with_ignore = labels.view(-1,).masked_fill(ignore_mask.view(-1,), -100)
-    return F.cross_entropy(logits.view(-1, num_tokens), labels_with_ignore)
+    mask = mask.bool()
+    labels_with_ignore = labels.masked_fill(~mask, -100)
+    loss = F.cross_entropy(
+        logits.view(-1, num_tokens),
+        labels_with_ignore.view(-1)
+    )
+    return loss
 
       
 def make_peft_model(
